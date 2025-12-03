@@ -6,76 +6,58 @@ from io import StringIO
 import pandas as pd
 import base64
 
-# --- Core Logic Functions (No Change) ---
+# --- Core Logic Functions (Unchanged) ---
 
 def extract_slug(url):
-    """
-    Tries to extract a clean, capitalized slug/keyword from the URL path.
-    """
     try:
         parsed_url = urlparse(url)
         path = parsed_url.path.strip('/')
         segments = path.split('/')
-        
         slug = ''
         if segments and segments[-1]:
             slug = segments[-1]
         elif len(segments) > 1 and segments[-2]:
             slug = segments[-2]
-
         if not slug:
             return 'Link'
-
         slug = re.sub(r'\.[^/.]+$', '', slug)
         slug = re.sub(r'[-_]', ' ', slug)
-        
         formatted_slug = ' '.join(word.capitalize() for word in slug.split())
         return formatted_slug if formatted_slug else 'Link'
-
     except Exception:
         return 'Link'
 
 def generate_links(urls):
-    """
-    Generates all bidirectional internal link variations for a list of URLs.
-    """
     link_data = []
-
     for i in range(len(urls)):
         for j in range(len(urls)):
             if i == j:
                 continue
-
             source_url = urls[i]
             target_url = urls[j]
-
             suggested_anchor = extract_slug(target_url)
             link_html = f'<a href="{target_url}">{suggested_anchor}</a>'
-
             link_data.append({
                 "Source URL": source_url,
                 "Target URL": target_url,
                 "Suggested Anchor Text (Placeholder)": suggested_anchor,
                 "Link HTML": link_html,
             })
-            
     return link_data
 
 def convert_to_csv(link_data):
-    """Converts the list of dictionaries into a CSV string."""
     output = StringIO()
     fieldnames = ["Source URL", "Target URL", "Suggested Anchor Text (Placeholder)", "Link HTML"]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
-    
     writer.writeheader()
     writer.writerows(link_data)
-    
     return output.getvalue()
 
 def copy_to_sheets_button(csv_string):
-    """Injects HTML and JS for a custom light blue copy-to-sheets button."""
-    
-    # Base64 encode the CSV string to safely pass it through the HTML attribute
+    """
+    Injects HTML and JS for a custom light blue copy-to-sheets button.
+    This is placed within a component for reliability.
+    """
     b64_csv = base64.b64encode(csv_string.encode('utf-8')).decode('utf-8')
     
     js_code = f"""
@@ -84,39 +66,38 @@ def copy_to_sheets_button(csv_string):
             const csvData = atob(b64Data);
             navigator.clipboard.writeText(csvData)
                 .then(() => {{
-                    // Display temporary success message
-                    const successDiv = document.createElement('div');
-                    successDiv.innerHTML = '<div style="background-color: #c8e6c9; color: #155724; padding: 12px; border-radius: 4px; margin-top: 16px; font-size: 0.9em; text-align: left;">Data copied to clipboard! Paste directly into Google Sheets.</div>';
-                    document.querySelector('.copy-to-sheets-placeholder').appendChild(successDiv);
-                    setTimeout(() => successDiv.remove(), 3000); 
+                    // Temporary visual feedback
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'stAlert'; 
+                    successMsg.innerHTML = '<div style="background-color: #c8e6c9; color: #155724; padding: 12px; border-radius: 4px; margin-top: 8px; font-size: 0.9em;">Data copied to clipboard!</div>';
+                    document.querySelector('.copy-to-sheets-container').appendChild(successMsg);
+                    setTimeout(() => successMsg.remove(), 2500); 
                 }})
                 .catch(err => {{
                     alert('Could not copy text: ' + err);
                 }});
         }}
     </script>
-    <div class="copy-to-sheets-placeholder"></div>
-    <button class="copy-to-sheets-btn stButton button" onclick="copyToClipboard('{b64_csv}')">
-        Copy to Sheets (CSV)
-    </button>
+    <div class="copy-to-sheets-container">
+        <button class="copy-to-sheets-btn stButton button" onclick="copyToClipboard('{b64_csv}')">
+            Copy to Sheets (CSV)
+        </button>
+    </div>
     """
+    # Using st.markdown to inject the button HTML/JS
     st.markdown(js_code, unsafe_allow_html=True)
 
 
 # --- Streamlit UI ---
 
 def app():
-    # Initialize session state for generated links
     if 'generated_links' not in st.session_state:
         st.session_state['generated_links'] = None
     
     # --- PAGE CONFIGURATION & CUSTOM CSS ---
-    st.set_page_config(
-        page_title="Internal Link Generator", 
-        layout="wide",
-        initial_sidebar_state="collapsed"
-    )
+    st.set_page_config(page_title="Internal Link Generator", layout="wide", initial_sidebar_state="collapsed")
 
+    # Injecting CSS for aesthetics and consistency
     st.markdown(
         """
         <style>
@@ -124,96 +105,70 @@ def app():
 
         /* 1. Overall App Background (Dark Pink) */
         .stApp {
-            background-color: #ffc0cb; /* Dark Pink */
+            background-color: #ffc0cb; 
             font-family: 'Archivo', sans-serif;
+            color: #333;
         }
 
         /* 2. Light Pink Container Box (Surface) */
         .main .block-container {
-            background-color: #ffe0eb; /* Light Pink */
-            border-radius: 8px; /* Standard Material rounding */
-            padding: 32px; /* Consistent spacing (multiple of 8) */
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* Material Elevation 2-3 equivalent */
+            background-color: #ffe0eb; 
+            border-radius: 8px; 
+            padding: 32px; 
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); 
             margin-top: 24px;
             margin-bottom: 24px;
         }
 
-        /* Centered H1 Heading Styling */
+        /* Header Styling */
         h1 {
             color: #6A1F8D;
-            font-size: 2em; /* Adjusted slightly smaller for Material text scale */
-            margin-bottom: 8px; /* Consistent spacing */
+            font-size: 2em;
+            margin-bottom: 8px;
         }
-        p {
-            margin-bottom: 24px; /* Consistent spacing */
-            font-size: 1.05em;
-        }
+        p { margin-bottom: 24px; font-size: 1.05em; }
         
-        /* Text Area Styling */
-        .stTextArea textarea {
-            border-radius: 4px; /* Material standard rounding */
-            border: 1px solid #ffabab; 
-            padding: 12px;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06); /* Subtle inner shadow for depth */
-        }
-
         /* General Button Styling */
         .stButton button, .stDownloadButton button, .copy-to-sheets-btn {
-            border-radius: 20px !important; /* Pill shape for action buttons */
+            border-radius: 20px !important; 
             font-weight: 700;
-            padding: 12px 20px; /* Consistent padding */
+            padding: 12px 20px; 
             transition: all 0.2s ease-out;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle elevation */
-            margin: 8px; /* Consistent spacing */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+            margin: 8px 8px 8px 0 !important; /* Consistent spacing: 8px top/bottom, 0 right, 8px left */
             border: none;
             color: white !important; 
         }
         .stButton button:hover, .stDownloadButton button:hover, .copy-to-sheets-btn:hover {
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Higher elevation on hover */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); 
             transform: translateY(-2px);
         }
 
-        /* Generate Links Button (Pink) */
-        .stButton button[kind="primary"] {
-            background-color: #ff69b4 !important; 
-        }
+        /* Button Colors */
+        .stButton button[kind="primary"] { background-color: #ff69b4 !important; } /* Pink */
+        .stDownloadButton button { background-color: #9c27b0 !important; } /* Purple */
+        .copy-to-sheets-btn { background-color: #87CEEB !important; } /* Light Blue */
 
-        /* Download CSV Button (Purple) */
-        .stDownloadButton button {
-            background-color: #9c27b0 !important; 
-        }
-
-        /* Copy to Sheets Button (Light Blue) */
-        .copy-to-sheets-btn {
-            background-color: #87CEEB !important;
-        }
-        
-        /* DataFrame Styling */
-        .stDataFrame {
-            margin-top: 24px;
-        }
-        /* Table Header Styling (Purple, Larger Font) */
+        /* Table Styling */
         .stDataFrame th {
             background-color: #6A1F8D !important;
             color: white !important;
-            font-size: 1.05em !important; /* Material Standard font size balance */
-            padding: 16px 12px !important; /* Uniform spacing */
+            font-size: 1.05em !important;
+            padding: 16px 12px !important;
         }
-        /* Table Body Cells */
-        .stDataFrame td {
-            padding: 12px !important; /* Consistent spacing */
-            font-size: 0.95em !important;
-        }
-        
+        .stDataFrame td { padding: 12px !important; font-size: 0.95em !important; }
+
         /* Instructions Styling */
+        .instructions-list { margin-left: auto; margin-right: auto; max-width: 800px; padding-left: 0; list-style: none;}
         .instructions-list li {
-            background-color: #fcf4f7; /* Very light pink/surface color */
+            background-color: #fcf4f7;
             margin-bottom: 8px;
             padding: 16px; 
             border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Very low elevation */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             font-size: 1em;
         }
+        .stAlert { margin-top: 16px !important; }
         </style>
         """, unsafe_allow_html=True
     )
@@ -237,18 +192,15 @@ def app():
         help="Paste a list of full URLs (e.g., https://example.com/page)."
     )
 
-    # --- BUTTONS ROW (Defined up front to ensure Above the Fold placement) ---
+    # --- BUTTONS ROW (Defined up front and ABOVE THE FOLD) ---
     st.markdown("<h3 style='color: #555; margin-top: 8px; margin-bottom: 8px; font-size: 1.1em;'>Actions:</h3>", unsafe_allow_html=True)
     
+    # Using columns to place buttons side-by-side
     btn_col1, btn_col2, btn_col3 = st.columns([0.25, 0.3, 0.45]) 
     
-    # 1. Generate Links Button (Pink) - Primary button
+    # 1. Generate Links Button (Pink)
     if btn_col1.button("Generate Links", key="generate_btn", type="primary"):
-        urls = [
-            url.strip() 
-            for url in urls_input.split('\n') 
-            if url.strip().startswith(('http://', 'https://'))
-        ]
+        urls = [url.strip() for url in urls_input.split('\n') if url.strip().startswith(('http://', 'https://'))]
 
         if len(urls) < 2:
             st.session_state['generated_links'] = []
@@ -298,8 +250,8 @@ def app():
             <li><strong>Step 3: Export Data</strong><br>
                 Use the buttons above the table to export the data:
                 <ul>
-                    <li>**Download CSV Data (Purple)**: Saves a file locally.</li>
-                    <li>**Copy to Sheets (CSV) (Light Blue)**: Copies data to your clipboard for instant pasting into Google Sheets.</li>
+                    <li><span style='color: #9c27b0; font-weight: bold;'>Download CSV Data (Purple)</span>: Saves a file locally.</li>
+                    <li><span style='color: #87CEEB; font-weight: bold;'>Copy to Sheets (CSV) (Light Blue)</span>: Copies data to your clipboard for instant pasting into Google Sheets.</li>
                 </ul>
             </li>
         </ul>
