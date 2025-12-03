@@ -1,0 +1,122 @@
+import csv
+import re
+from urllib.parse import urlparse
+
+def extract_slug(url):
+    """
+    Tries to extract a clean, capitalized slug/keyword from the URL path
+    to use as a suggested anchor text.
+    """
+    try:
+        # 1. Parse the URL
+        parsed_url = urlparse(url)
+        # Get the path, remove leading/trailing slashes
+        path = parsed_url.path.strip('/')
+
+        # 2. Extract the last segment of the path
+        segments = path.split('/')
+        if segments and segments[-1]:
+            # Use the last segment if it's not empty
+            slug = segments[-1]
+        elif len(segments) > 1 and segments[-2]:
+            # Fallback to the second to last segment (handles trailing slashes)
+            slug = segments[-2]
+        else:
+            return 'Link'
+
+        # 3. Clean and format the slug
+        # Remove file extensions (like .html or .php)
+        slug = re.sub(r'\.[^/.]+$', '', slug)
+        # Replace hyphens/underscores with spaces
+        slug = re.sub(r'[-_]', ' ', slug)
+        
+        # Capitalize the first letter of each word
+        formatted_slug = ' '.join(word.capitalize() for word in slug.split())
+        return formatted_slug if formatted_slug else 'Link'
+
+    except Exception:
+        return 'Link'
+
+def generate_links(urls_input):
+    """
+    Generates all bidirectional internal link variations for a list of URLs.
+    """
+    # Clean and filter URLs: strip whitespace, filter for non-empty lines, require http/https prefix
+    urls = [url.strip() for url in urls_input.split('\n') if url.strip().startswith(('http://', 'https://'))]
+
+    if len(urls) < 2:
+        print("\n[ERROR] Please enter at least two valid URLs (starting with http:// or https://).")
+        return []
+
+    link_data = []
+
+    # Nested loop to generate all unique bidirectional pairs (N * (N-1) pairs)
+    for i in range(len(urls)):
+        for j in range(len(urls)):
+            # Skip linking a URL to itself
+            if i == j:
+                continue
+
+            source_url = urls[i]
+            target_url = urls[j]
+
+            suggested_anchor = extract_slug(target_url)
+            link_html = f'<a href="{target_url}">{suggested_anchor}</a>'
+
+            link_data.append({
+                "Source URL": source_url,
+                "Target URL": target_url,
+                "Suggested Anchor Text (Placeholder)": suggested_anchor,
+                "Link HTML": link_html,
+            })
+            
+    print(f"\n[SUCCESS] Generated {len(link_data)} bidirectional link rows.")
+    return link_data
+
+def main():
+    """
+    Handles user interaction and file output.
+    """
+    print("=" * 50)
+    print("  🔗 BIDIRECTIONAL INTERNAL LINK GENERATOR 🚀") # UPDATED TITLE
+    print("=" * 50)
+    print("Paste your list of URLs below (one per line).")
+    print("Press CTRL+D (Linux/Mac) or CTRL+Z then Enter (Windows) when finished.")
+    
+    # Read multiline input from the user
+    urls_input = ""
+    while True:
+        try:
+            line = input()
+            urls_input += line + "\n"
+        except EOFError:
+            break
+        except KeyboardInterrupt:
+            break
+
+    # Generate the data
+    link_data = generate_links(urls_input.strip())
+
+    if link_data:
+        # Define the output file name and columns
+        output_filename = "internal_links_output.csv"
+        fieldnames = ["Source URL", "Target URL", "Suggested Anchor Text (Placeholder)", "Link HTML"]
+
+        # Write data to CSV
+        try:
+            with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                
+                writer.writeheader()
+                writer.writerows(link_data)
+            
+            print("-" * 50)
+            print(f"✅ Data saved successfully to: {output_filename}")
+            print("You can now import this file into Google Sheets or Excel.")
+            print("-" * 50)
+
+        except Exception as e:
+            print(f"\n[ERROR] Failed to write CSV file: {e}")
+
+if __name__ == "__main__":
+    main()
