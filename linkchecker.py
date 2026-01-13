@@ -7,10 +7,45 @@ from urllib.parse import urljoin
 import xml.etree.ElementTree as ET
 
 # Page Config
-st.set_page_config(page_title="Ultimate SEO Link Auditor", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Internal Link Optimiser", page_icon="✨", layout="wide")
 
-st.title("🛡️ Ultimate Internal Link & Redirect Auditor")
-st.write("Audit specific pages, bulk lists, or sitemaps to find 301s and 404s within body text.")
+# Custom Styling for Colors, Sidebar Width, and Info Boxes
+st.markdown(f"""
+    <style>
+    /* Main background color */
+    .stApp {{
+        background-color: #FFC7D5;
+    }}
+    
+    /* Sidebar background color and width */
+    [data-testid="stSidebar"] {{
+        background-color: #FFE6EC;
+        min-width: 400px !important;
+        max-width: 400px !important;
+    }}
+
+    /* "Run Audit 🌸" Button Styling */
+    div.stButton > button:first-child {{
+        background-color: #ff4b4b;
+        color: white;
+        border-radius: 10px;
+        height: 3em;
+        width: 100%;
+        font-weight: bold;
+        border: none;
+    }}
+
+    /* Make Info boxes white */
+    .stAlert {{
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid #FFE6EC;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("✨ Internal Link Optimiser ✨")
+st.write("Clean up your internal link structure by identifying 301s and 404s inside your page content.")
 
 # --- SIDEBAR INPUTS ---
 with st.sidebar:
@@ -20,7 +55,7 @@ with st.sidebar:
     if mode == "Single URL":
         input_data = st.text_input("Enter Page URL", placeholder="https://example.com/page")
     elif mode == "Bulk URL List":
-        input_data = st.text_area("Paste URLs (one per line)", placeholder="https://example.com/page1\nhttps://example.com/page2")
+        input_data = st.text_area("Paste URLs (one per line)", placeholder="https://example.com/page1\nhttps://example.com/page2", height=300)
     else:
         input_data = st.text_input("Enter Sitemap URL", placeholder="https://example.com/sitemap.xml")
     
@@ -47,7 +82,6 @@ def audit_page_links(source_url):
         resp = requests.get(source_url, headers=headers, timeout=10)
         soup = BeautifulSoup(resp.text, 'html.parser')
         
-        # Focus on Main Content
         main_content = soup.find('main') or soup.find('article') or soup.find('div', id='MainContent') or soup.find('body')
         links = main_content.find_all('a', href=True)
         
@@ -59,10 +93,8 @@ def audit_page_links(source_url):
             if not absolute_link.startswith('http'): continue
 
             try:
-                # We use GET to follow the full redirect chain
                 link_check = requests.get(absolute_link, headers=headers, timeout=10, allow_redirects=True)
                 
-                # Check for redirect history
                 if len(link_check.history) > 0:
                     initial_status = link_check.history[0].status_code
                     final_url = link_check.url
@@ -70,7 +102,6 @@ def audit_page_links(source_url):
                     initial_status = link_check.status_code
                     final_url = "Direct"
 
-                # Log only if it's a redirect or error
                 if initial_status != 200:
                     results.append({
                         "Source Page": source_url,
@@ -91,7 +122,7 @@ def audit_page_links(source_url):
         return []
 
 # --- RUN AUDIT ---
-if st.button("🚀 Run Audit"):
+if st.button("Run Audit 🌸"):
     urls_to_crawl = []
     
     if mode == "Single URL" and input_data:
